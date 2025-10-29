@@ -8,11 +8,13 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, "contacts.json");
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "toxic123"; // default fallback
+const PUBLIC_DIR = path.join(__dirname, "public");
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "toxic123";
 
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(__dirname)); // serve index.html directly
+app.use(express.static(PUBLIC_DIR)); // Serve index.html + assets
 
 // --- Utility functions ---
 function readContacts() {
@@ -48,7 +50,6 @@ app.post("/api/contacts", (req, res) => {
 
   const contacts = readContacts();
 
-  // prevent duplicates
   if (contacts.some((c) => c.phone === phone))
     return res.status(400).json({ error: "Contact already exists" });
 
@@ -84,7 +85,12 @@ app.get("/api/contacts/export", (req, res) => {
   res.send(vcf);
 });
 
-// --- Start Server ---
-app.listen(PORT, () =>
-  console.log(`✅ VCF Collector running at http://localhost:${PORT}`)
-);
+// --- Route fallback to index.html ---
+app.get("*", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+});
+
+// --- Start server ---
+app.listen(PORT, () => {
+  console.log(`✅ Server running at http://localhost:${PORT}`);
+});
