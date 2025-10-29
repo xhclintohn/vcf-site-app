@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VCF Contact Collector | Professional</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #00d2ff;
+      --primary-dark: #0077ff;
+      --secondary: #ff416c;
+      --secondary-dark: #ff4b2b;
+      --dark: #0f2027;
+      --darker: #0a161b;
+      --light: #ffffff;
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --success: #00e676;
+      --error: #ff5252;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at center, #0f2027 0%, #091218 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: var(--light);
+      overflow: hidden;
+    }
+
+    canvas#dnaBackground {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      background: linear-gradient(135deg, #0a161b, #0f2027);
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 40px;
+      width: 90%;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      position: relative;
+      animation: fadeIn 1s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 10px;
+      color: var(--primary);
+      filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.5));
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      background: linear-gradient(45deg, var(--primary), var(--primary-dark));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      opacity: 0.8;
+      margin-bottom: 25px;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px 18px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      outline: none;
+      margin-bottom: 15px;
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--light);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 8px var(--primary);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(45deg, var(--secondary), var(--secondary-dark));
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 0 15px rgba(255, 65, 108, 0.6);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(45deg, var(--primary), var(--primary-dark));
+      display: none;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 25px;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      font-size: 14px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    .footer {
+      margin-top: 30px;
+      font-size: 12px;
+      opacity: 0.6;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 10px;
+      color: white;
+      font-weight: bold;
+      z-index: 1000;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+    }
+
+    .toast.show { transform: translateX(0); }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--error); }
+  </style>
+</head>
+<body>
+  <canvas id="dnaBackground"></canvas>
+
+  <div class="container">
+    <div class="logo"><i class="fas fa-address-card"></i></div>
+    <h1>VCF Contact Collector</h1>
+    <p class="subtitle">Securely collect and export contacts in VCF format</p>
+
+    <form id="contactForm">
+      <input type="text" id="name" placeholder="Full Name" required />
+      <input type="tel" id="phone" placeholder="254*****" required />
+      <button type="submit" class="btn btn-primary">Add Contact</button>
+    </form>
+
+    <button id="downloadBtn" class="btn btn-secondary">
+      <i class="fas fa-download"></i> Download VCF File
+    </button>
+
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-value" id="contactsCount">0</div>
+        <div class="stat-label">Contacts</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="todayCount">0</div>
+        <div class="stat-label">Today</div>
+      </div>
+    </div>
+
+    <div class="footer">Your data is securely stored and encrypted</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    const API_BASE = window.location.origin + '/api';
+
+    const form = document.getElementById("contactForm");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const toast = document.getElementById("toast");
+    const contactsCount = document.getElementById("contactsCount");
+    const todayCount = document.getElementById("todayCount");
+
+    function showToast(msg, type) {
+      toast.textContent = msg;
+      toast.className = `toast ${type} show`;
+      setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
+    async function updateStats() {
+      try {
+        const response = await fetch(`${API_BASE}/contacts/stats`);
+        if (!response.ok) throw new Error('Failed to fetch stats');
+        const { total, today } = await response.json();
+        contactsCount.textContent = total;
+        todayCount.textContent = today;
+        if (total > 0) downloadBtn.style.display = "block";
+      } catch (err) {
+        console.error('Stats error:', err);
+        showToast("❌ Error fetching stats: " + err.message, "error");
+      }
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      try {
+        const response = await fetch(`${API_BASE}/contacts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone })
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to add contact');
+        }
+        showToast("✅ Contact Added Successfully!", "success");
+        form.reset();
+        updateStats();
+      } catch (err) {
+        showToast("❌ Error saving contact: " + err.message, "error");
+      }
+    });
+
+    downloadBtn.addEventListener("click", async () => {
+      const pass = prompt("🔒 Enter admin password:");
+      if (!pass) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/contacts/export?password=${encodeURIComponent(pass)}`);
+        if (response.status === 401) return showToast("❌ Incorrect password!", "error");
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to download');
+        }
+        const vcfData = await response.text();
+        const blob = new Blob([vcfData], { type: "text/vcard" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "contacts.vcf";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("✅ VCF file downloaded!", "success");
+      } catch (err) {
+        showToast("❌ Error downloading: " + err.message, "error");
+      }
+    });
+
+    function createDNABackground() {
+      const canvas = document.getElementById("dnaBackground");
+      const ctx = canvas.getContext("2d");
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      const helixCount = 3, dots = 60, amp = 80, speed = 0.03;
+      const gap = width / (helixCount + 1);
+      let t = 0;
+
+      function draw() {
+        ctx.clearRect(0, 0, width, height);
+        ctx.save(); ctx.translate(0, height / 2);
+        for (let h = 0; h < helixCount; h++) {
+          const xOff = gap * (h + 1);
+          for (let i = 0; i < dots; i++) {
+            const y = (i / dots) * height * 1.5 - height / 2;
+            const x = Math.sin(i * 0.3 + t) * amp;
+            const p = (Math.cos(i * 0.3 + t) + 1.5) / 2.5;
+            const s = p * 5 + 2;
+            ctx.beginPath();
+            ctx.arc(xOff + x, y, s, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(0,210,255,0.7)";
+            ctx.shadowBlur = 10 * p;
+            ctx.shadowColor = "#00d2ff";
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+        t += speed;
+        requestAnimationFrame(draw);
+      }
+
+      window.addEventListener("resize", () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+      draw();
+    }
+
+    createDNABackground();
+    updateStats();
+  </script>
+</body>
+</html>
