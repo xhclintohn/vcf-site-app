@@ -1,99 +1,90 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const path = require('path');
-const pool = require('./db');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, "contacts.json");
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "toxic123"; // default fallback
 
-// Middleware
-app.use(helmet());
-app.use(morgan('combined'));
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static(__dirname)); // serve index.html directly
 
-// Clean phone helper
-function cleanPhone(num) {
-  let cleaned = num.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-  if (!cleaned.startsWith('+')) cleaned = '+' + cleaned;
-  return cleaned;
+// --- Utility functions ---
+function readContacts() {
+  if (!fs.existsSync(DATA_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  } catch {
+    return [];
+  }
 }
 
-// POST /api/contacts - Add contact
-app.post('/api/contacts', async (req, res) => {
-  try {
-    const { name, phone } = req.body;
-    if (!name || !phone) return res.status(400).json({ error: 'Name and phone required' });
+function writeContacts(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
-    const cleanedPhone = cleanPhone(phone);
-    const result = await pool.query(
-      'INSERT INTO contacts (name, phone) VALUES ($1, $2) RETURNING *',
-      [name.trim(), cleanedPhone]
-    );
+function generateVCF(contacts) {
+  return contacts
+    .map(
+      (c) => `BEGIN:VCARD
+VERSION:3.0
+FN:${c.name}
+TEL;TYPE=CELL:+${c.phone}
+END:VCARD`
+    )
+    .join("\n");
+}
 
-    res.status(201).json({ message: 'Contact added successfully!', contact: result.rows[0] });
-  } catch (err) {
-    console.error('Add contact error:', err);
-    res.status(500).json({ error: 'Failed to add contact' });
-  }
+// --- API: Add contact ---
+app.post("/api/contacts", (req, res) => {
+  const { name, phone } = req.body;
+  if (!name || !phone)
+    return res.status(400).json({ error: "Name and phone are required" });
+
+  const contacts = readContacts();
+
+  // prevent duplicates
+  if (contacts.some((c) => c.phone === phone))
+    return res.status(400).json({ error: "Contact already exists" });
+
+  contacts.push({
+    name,
+    phone,
+    date: new Date().toISOString(),
+  });
+
+  writeContacts(contacts);
+  res.json({ success: true });
 });
 
-// GET /api/contacts/stats - Get counts
-app.get('/api/contacts/stats', async (req, res) => {
-  try {
-    const { rows: [total] } = await pool.query('SELECT COUNT(*) as count FROM contacts');
-    const todayCount = Math.min(parseInt(total.count), Math.floor(Math.random() * 5) + 1);
-
-    res.json({
-      total: parseInt(total.count),
-      today: todayCount
-    });
-  } catch (err) {
-    console.error('Stats error:', err);
-    res.status(500).json({ error: 'Failed to fetch stats' });
-  }
+// --- API: Get stats ---
+app.get("/api/contacts/stats", (req, res) => {
+  const contacts = readContacts();
+  const today = new Date().toISOString().split("T")[0];
+  const todayCount = contacts.filter((c) => c.date.startsWith(today)).length;
+  res.json({ total: contacts.length, today: todayCount });
 });
 
-// GET /api/contacts/export - Download VCF
-app.get('/api/contacts/export', async (req, res) => {
+// --- API: Export VCF ---
+app.get("/api/contacts/export", (req, res) => {
   const { password } = req.query;
-  if (password !== 'toxic123') {
-    return res.status(401).json({ error: 'Incorrect password' });
-  }
+  if (password !== ADMIN_PASSWORD)
+    return res.status(401).json({ error: "Unauthorized" });
 
-  try {
-    const { rows } = await pool.query('SELECT name, phone FROM contacts');
-    let vcfData = '';
-    rows.forEach(c => {
-      vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${c.name}\nTEL:${c.phone}\nEND:VCARD\n`;
-    });
+  const contacts = readContacts();
+  const vcf = generateVCF(contacts);
 
-    if (!vcfData) return res.status(404).json({ error: 'No contacts found' });
-
-    res.set({
-      'Content-Type': 'text/vcard',
-      'Content-Disposition': 'attachment; filename="contacts.vcf"'
-    });
-    res.send(vcfData);
-  } catch (err) {
-    console.error('Export error:', err);
-    res.status(500).json({ error: 'Failed to export' });
-  }
+  res.setHeader("Content-Disposition", "attachment; filename=contacts.vcf");
+  res.setHeader("Content-Type", "text/vcard; charset=utf-8");
+  res.send(vcf);
 });
 
-// Serve frontend
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/vcf.html'));
-});
-
-// Health check
-app.get('/health', (req, res) => res.send('OK'));
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Frontend: http://localhost:${PORT}`);
-  console.log(`🔗 API: http://localhost:${PORT}/api/contacts`);
-});
+// --- Start Server ---
+app.listen(PORT, () =>
+  console.log(`✅ VCF Collector running at http://localhost:${PORT}`)
+);
