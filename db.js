@@ -1,55 +1,28 @@
 // db.js
-const { Pool } = require("pg");
+import pkg from "pg";
+import dotenv from "dotenv";
 
-console.log("🔄 Initializing database connection...");
+dotenv.config(); // Load environment variables from .env file
 
-// ✅ Detect local vs production (Heroku)
-let connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  // fallback for local testing
-  connectionString = "postgresql://postgres:password@localhost:5432/vcf_collector";
-}
+const { Pool } = pkg;
 
+// Create a new PostgreSQL connection pool
 const pool = new Pool({
-  connectionString,
-  ssl: connectionString.includes("heroku") ? { rejectUnauthorized: false } : false,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // required for Heroku & AWS RDS SSL
+  },
 });
 
+// Simple test to verify connection
 (async () => {
-  const client = await pool.connect();
   try {
-    console.log("🔄 Setting up database...");
-
-    // ✅ Create DB schema and tables automatically
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS contacts (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        timestamp TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    await client.query(`
-      INSERT INTO settings (key, value)
-      VALUES ('app_version', '1.0.0')
-      ON CONFLICT (key) DO NOTHING;
-    `);
-
-    console.log("✅ Database ready! Tables: settings, contacts");
-  } catch (err) {
-    console.error("❌ Database setup failed:", err.message);
-    process.exit(1);
-  } finally {
+    const client = await pool.connect();
+    console.log("✅ Connected to PostgreSQL database successfully!");
     client.release();
+  } catch (err) {
+    console.error("❌ Database connection error:", err);
   }
 })();
 
-module.exports = pool;
+export default pool;
