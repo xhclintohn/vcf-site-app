@@ -8,19 +8,18 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, "contacts.json");
-const PUBLIC_DIR = path.join(__dirname, "public");
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "toxic123";
 
-// Create contacts.json if it doesn't exist
+// ✅ Create contacts.json if missing
 if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, "[]", "utf8");
   console.log("🆕 contacts.json created!");
 }
 
-// Middleware
+// ✅ Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(PUBLIC_DIR)); // Serve static files from public/
+app.use(express.static(__dirname)); // serve static files (index.html, etc.)
 
 // --- Helper functions ---
 function readContacts() {
@@ -85,12 +84,12 @@ app.get("/api/contacts/export", (req, res) => {
   res.send(vcf);
 });
 
-// --- Fallback to index.html for any unknown route ---
+// --- Serve index.html by default ---
 app.get("*", (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// --- Start the server ---
+// --- Start server ---
 app.listen(PORT, () => {
   console.log(`✅ Server running at: http://localhost:${PORT}`);
 });
