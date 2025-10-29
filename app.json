@@ -6,7 +6,7 @@
 
   "addons": [
     {
-      "plan": "heroku-postgresql:hobby-dev",
+      "plan": "heroku-postgresql",
       "description": "🗃️ Free PostgreSQL database for storing bot data."
     }
   ],
