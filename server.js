@@ -11,14 +11,19 @@ const DATA_FILE = path.join(__dirname, "contacts.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "toxic123";
 
+// Create contacts.json if it doesn't exist
+if (!fs.existsSync(DATA_FILE)) {
+  fs.writeFileSync(DATA_FILE, "[]", "utf8");
+  console.log("🆕 contacts.json created!");
+}
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(PUBLIC_DIR)); // Serve index.html + assets
+app.use(express.static(PUBLIC_DIR)); // Serve static files from public/
 
-// --- Utility functions ---
+// --- Helper functions ---
 function readContacts() {
-  if (!fs.existsSync(DATA_FILE)) return [];
   try {
     return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
   } catch {
@@ -27,7 +32,7 @@ function readContacts() {
 }
 
 function writeContacts(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
 function generateVCF(contacts) {
@@ -42,28 +47,23 @@ END:VCARD`
     .join("\n");
 }
 
-// --- API: Add contact ---
+// --- POST /api/contacts ---
 app.post("/api/contacts", (req, res) => {
   const { name, phone } = req.body;
   if (!name || !phone)
-    return res.status(400).json({ error: "Name and phone are required" });
+    return res.status(400).json({ error: "Name and phone required" });
 
   const contacts = readContacts();
 
   if (contacts.some((c) => c.phone === phone))
     return res.status(400).json({ error: "Contact already exists" });
 
-  contacts.push({
-    name,
-    phone,
-    date: new Date().toISOString(),
-  });
-
+  contacts.push({ name, phone, date: new Date().toISOString() });
   writeContacts(contacts);
   res.json({ success: true });
 });
 
-// --- API: Get stats ---
+// --- GET /api/contacts/stats ---
 app.get("/api/contacts/stats", (req, res) => {
   const contacts = readContacts();
   const today = new Date().toISOString().split("T")[0];
@@ -71,7 +71,7 @@ app.get("/api/contacts/stats", (req, res) => {
   res.json({ total: contacts.length, today: todayCount });
 });
 
-// --- API: Export VCF ---
+// --- GET /api/contacts/export ---
 app.get("/api/contacts/export", (req, res) => {
   const { password } = req.query;
   if (password !== ADMIN_PASSWORD)
@@ -85,12 +85,12 @@ app.get("/api/contacts/export", (req, res) => {
   res.send(vcf);
 });
 
-// --- Route fallback to index.html ---
+// --- Fallback to index.html for any unknown route ---
 app.get("*", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
-// --- Start server ---
+// --- Start the server ---
 app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`✅ Server running at: http://localhost:${PORT}`);
 });
